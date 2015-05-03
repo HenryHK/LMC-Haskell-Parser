@@ -43,25 +43,25 @@ instruction :: Parser Instruction
 instruction = P (\inp -> case parse (sepBy (many alphanum ) (char ' '+++char '/')) inp of 
 						[([ins], out)] -> case takeWhile (/='/') ins of 
 												"DAT" -> [(DAT 0, out)]
-												ins' -> [((read ins') :: Instruction, out)]
+												ins' -> [(read ins' :: Instruction, out)]
 						[([ins, lbl], out)]	-> 	case ins of
 												"DAT" -> case lbl of 
 															"" -> [(DAT 0, out)]
 															('/':_) -> [(DAT 0, out)]
-															otherwise -> [((read ("DAT " ++ takeWhile (/='/') lbl))::Instruction, out)]
+															otherwise -> [(read ("DAT " ++ takeWhile (/='/') lbl)::Instruction, out)]
 												ins' -> case lbl of 
-															"" -> [((read ins') :: Instruction, out)]
-															('/':_) -> [((read ins') :: Instruction, out)]
-															otherwise -> [((read (ins' ++ " \"" ++ takeWhile (/='/') lbl ++"\"")) :: Instruction, out)]
+															"" -> [(read ins' :: Instruction, out)]
+															('/':_) -> [(read ins' :: Instruction, out)]
+															otherwise -> [(read (ins' ++ " \"" ++ takeWhile (/='/') lbl ++"\"") :: Instruction, out)]
 						[( ins:(lbl:_ ) , out)]	-> 	case ins of
 												"DAT" -> case lbl of
 															"" -> [(DAT 0, out)] 
 															('/':_) -> [(DAT 0, out)]
-															otherwise -> [((read ("DAT " ++ takeWhile (/='/') lbl))::Instruction, out)]
+															otherwise -> [(read ("DAT " ++ takeWhile (/='/') lbl) :: Instruction, out)]
 												ins' -> case lbl of
-															"" -> [((read ins') :: Instruction, out)] 
-															('/':_) -> [((read ins') :: Instruction, out)]
-															otherwise -> [((read (ins' ++ " \"" ++ takeWhile (/='/') lbl ++"\"")) :: Instruction, out)]
+															"" -> [(read ins' :: Instruction, out)] 
+															('/':_) -> [(read ins' :: Instruction, out)]
+															otherwise -> [(read (ins' ++ " \"" ++ takeWhile (/='/') lbl ++"\"") :: Instruction, out)]
 						otherwise -> []			
 						)
 line :: Parser (Maybe Label, Instruction)
@@ -112,8 +112,8 @@ parseLMC s = case parse (sepBy line (char '\n')) s of
 showProgram :: Program -> String
 showProgram [] = []
 showProgram ((maybeLabel,ins):xs) = case maybeLabel of 
-										Just label -> label ++ " " ++ [x | x <- (show ins), x/='\"'] ++ "\n" ++ showProgram xs 
-										Nothing -> " " ++ [x | x <- (show ins), x/='\"'] ++ "\n" ++ showProgram xs 
+										Just label -> label ++ " " ++ [x | x <- show ins, x/='\"'] ++ "\n" ++ showProgram xs 
+										Nothing -> " " ++ [x | x <- show ins, x/='\"'] ++ "\n" ++ showProgram xs 
 
 type Addr = Int
 type Accumulator = Maybe Int
@@ -140,13 +140,13 @@ initMailboxes (x:xs) = initMailboxes xs
 initLabelAddr :: [Maybe Label] -> [(Label, Addr)]
 initLabelAddr labels = let label' = map (\x -> case x of 
 													Just v -> v
-													Nothing -> "") labels in [x | x <- zip label' [0..length label'-1]]
+													Nothing -> "") labels in zip label' [0..length label'-1]
 
 mkInitEnv :: Program -> Env
 mkInitEnv prog = Env {  mailboxes = initMailboxes prog,
 						accumulator = Nothing,
 						pc = 0,
-						instructions =  foldr (\x acc -> (snd x):acc) [] prog,
+						instructions =  foldr (\x acc -> snd x : acc) [] prog,
 						labelAddr = initLabelAddr [fst x | x <- prog]
 						}
 
@@ -182,8 +182,8 @@ decode (STA op) =
 	do val <- getAccumulator
 	   env <- get
 	   case lookup op (mailboxes env) of 
-	   		Just v -> put $ env {mailboxes = ((op,val): (filter (\x -> fst x/=op) (mailboxes env)))}
-	   		Nothing -> put $ env {mailboxes = ((op,val):(mailboxes env))}
+	   		Just v -> put $ env {mailboxes = (op,val) : filter (\x -> fst x/=op) (mailboxes env)}
+	   		Nothing -> put $ env {mailboxes = (op,val) : mailboxes env}
 	   i <- nextInstruction
 	   decode i
 decode (LDA op) =
@@ -208,7 +208,7 @@ decode (BRP branch) =
 	do env <- get
 	   acc <- getAccumulator
 	   if acc>0 then
-	   		do decode (BRA branch)
+	   		decode (BRA branch)
 	   else
 	   		do i <- nextInstruction
 	   		   decode i
@@ -243,7 +243,9 @@ nextInstruction =
     do env <- get
        let i = pc env
        when (i == length (instructions env)) $ error "No more instructions"
+       --liftIO $ print (pc env)
        put $ env { pc = i + 1 }
+       --liftIO $ print (pc env)
        return $ instructions env !! i
 
 evalProgram :: Program -> IO ()
