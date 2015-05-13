@@ -1,4 +1,4 @@
-Simple Little Man Computer Parser in Haskell
+## Simple Little Man Computer Parser in Haskell
 
 Supporting commands:
 
